@@ -1,0 +1,40 @@
+\documentclass[a4paper,11pt]{scrartcl}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, margin=2cm]{geometry}
+
+\title{Analytik-Bericht}
+\date{<<EXPORT_DATE>>}
+
+\begin{document}
+
+\maketitle
+
+\noindent
+\textbf{Von:} <<DATE_FROM>>\quad
+\textbf{Bis:} <<DATE_TO>>
+
+\vspace{1em}
+
+\section*{Zusammenfassung}
+
+\begin{tabular}{ll}
+\textbf{Bewerbungen gesamt}    & <<TOTAL_APPLICATIONS>> \\[0.3em]
+\textbf{Aktive Bewerbungen}    & <<ACTIVE_APPLICATIONS>> \\[0.3em]
+\textbf{Antwortrate}           & <<RESPONSE_RATE>> \\[0.3em]
+\textbf{Durchschn.\ Priorit\"at} & <<AVG_PRIORITY>> \\
+\end{tabular}
+
+\vspace{1em}
+
+\section*{Status-Verteilung}
+
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Status} & \textbf{Anzahl} & \textbf{Anteil} \\
+\hline
+<<STATUS_TABLE_ROWS>>
+\hline
+\end{tabular}
+
+\end{document}

@@ -1,10 +1,11 @@
 """Main application window for the Job Application Tracker."""
 
-from PyQt6.QtWidgets import QMainWindow, QTabWidget, QWidget
+from PyQt6.QtWidgets import QMainWindow, QTabWidget
 
 from jat.gui.tab_analytics import AnalyticsTab
 from jat.gui.tab_applications import ApplicationsTab
 from jat.gui.tab_companies import CompaniesTab
+from jat.gui.tab_export import ExportTab
 from jat.gui.tab_settings import SettingsTab
 
 
@@ -23,10 +24,11 @@ class MainWindow(QMainWindow):
         self._applications_tab = ApplicationsTab()
         self._companies_tab = CompaniesTab()
         self._analytics_tab = AnalyticsTab()
+        self._export_tab = ExportTab()
         self._tabs.addTab(self._applications_tab, "Applications")
         self._tabs.addTab(self._companies_tab, "Companies")
         self._tabs.addTab(self._analytics_tab, "Analytics")
-        self._tabs.addTab(QWidget(), "Export")
+        self._tabs.addTab(self._export_tab, "Export")
         self._tabs.addTab(SettingsTab(), "Settings")
 
         self._tabs.currentChanged.connect(self._on_tab_changed)

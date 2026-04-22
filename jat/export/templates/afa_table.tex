@@ -1,0 +1,31 @@
+\documentclass[a4paper,11pt]{scrartcl}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper, margin=2cm]{geometry}
+\usepackage{longtable}
+
+\title{Bewerbungsliste}
+\date{<<EXPORT_DATE>>}
+
+\begin{document}
+
+\maketitle
+
+\noindent
+\textbf{Von:} <<DATE_FROM>>\quad
+\textbf{Bis:} <<DATE_TO>>\quad
+\textbf{Status:} <<STATUS_FILTER>>\quad
+\textbf{Gesamt:} <<TOTAL_COUNT>>
+
+\vspace{1em}
+
+\begin{longtable}{|l|p{4cm}|p{4.5cm}|l|l|l|}
+\hline
+\textbf{Datum} & \textbf{Unternehmen} & \textbf{Stelle} & \textbf{Quelle} & \textbf{Status} & \textbf{Ort} \\
+\hline
+\endhead
+<<TABLE_ROWS>>
+\hline
+\end{longtable}
+
+\end{document}

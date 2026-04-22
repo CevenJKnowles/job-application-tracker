@@ -116,11 +116,13 @@ CREATE TABLE IF NOT EXISTS companies (
     company_name        TEXT NOT NULL UNIQUE,
     company_website     TEXT,
     industry            TEXT,
-    company_size_band   TEXT,
-    linkedin_url        TEXT,
+    notes               TEXT,
     created_at          DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 ```
+
+Note: `notes` was added via `run_migrations()` using `ALTER TABLE ADD COLUMN`.
+The migration is idempotent and runs on every application start.
 
 ### Reference Tables (all follow this pattern)
 
@@ -132,9 +134,14 @@ CREATE TABLE IF NOT EXISTS ref_statuses (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     label       TEXT NOT NULL,
     sort_order  INTEGER DEFAULT 0,
-    is_active   INTEGER DEFAULT 1
+    is_active   INTEGER DEFAULT 1,
+    funnel_order INTEGER
 );
 ```
+
+Note: `funnel_order` was added to `ref_statuses` only (not other ref_ tables)
+via `run_migrations()` in M5. Default values: Applied=1, Interview=2,
+Final Stage=3, Offer=4; all others NULL.
 
 ### Default Reference Values
 
