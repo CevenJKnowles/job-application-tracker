@@ -5,6 +5,9 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 
+# Claude Code
+CLAUDE.md
+
 # Zettlr
 .ztr-directory
 
