@@ -1,5 +1,6 @@
 """Companies tab: browse, search, and manage company records."""
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -76,6 +77,12 @@ class CompaniesTab(QWidget):
         self._table.horizontalHeader().setStretchLastSection(True)
         root.addWidget(self._table)
 
+        self._empty_label = QLabel(
+            "No companies yet. Click + Add to begin.", self._table
+        )
+        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_label.hide()
+
         # ── Status bar ───────────────────────────────────────────────────────
         self._status_label = QLabel()
         root.addWidget(self._status_label)
@@ -135,6 +142,7 @@ class CompaniesTab(QWidget):
         self._table.horizontalHeader().setStretchLastSection(True)
         self._update_status(rows)
         self._apply_filter()
+        self._refresh_empty_state()
 
     def _apply_filter(self) -> None:
         """Show/hide rows based on the search input and industry combo. No DB call."""
@@ -156,6 +164,19 @@ class CompaniesTab(QWidget):
             matches_industry = all_industries or ind_text == industry_filter
 
             self._table.setRowHidden(row, not (matches_search and matches_industry))
+
+        self._refresh_empty_state()
+
+    def _refresh_empty_state(self) -> None:
+        """Show the empty-state label when no rows are visible; hide it otherwise."""
+        visible = sum(
+            1 for r in range(self._table.rowCount())
+            if not self._table.isRowHidden(r)
+        )
+        self._empty_label.setGeometry(self._table.rect())
+        self._empty_label.setVisible(visible == 0)
+        if visible == 0:
+            self._empty_label.raise_()
 
     def _update_status(self, rows) -> None:
         """Update the status label with total company and application counts."""

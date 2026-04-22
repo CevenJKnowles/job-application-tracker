@@ -2,6 +2,7 @@
 
 import sys
 
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from jat.database.connection import get_connection
@@ -18,6 +19,7 @@ def main() -> None:
     seed_defaults()
 
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("assets/icons/jat_icon.png"))
 
     window = MainWindow()
     window.show()

@@ -96,4 +96,3 @@ def seed_defaults() -> None:
 
 if __name__ == "__main__":
     seed_defaults()
-    print("Reference data seeded.")

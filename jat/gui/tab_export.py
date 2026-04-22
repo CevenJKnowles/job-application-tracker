@@ -195,9 +195,12 @@ class ExportTab(QWidget):
             self._status_label.setStyleSheet("")
             self._status_label.setText(f"Exportiert nach: {directory}")
 
-        except (IOError, OSError, ValueError, RuntimeError) as exc:
+        except (IOError, OSError, PermissionError) as exc:
             self._status_label.setStyleSheet("color: red;")
-            self._status_label.setText(f"Fehler: {exc}")
+            self._status_label.setText(str(exc))
+        except Exception as exc:
+            self._status_label.setStyleSheet("color: red;")
+            self._status_label.setText(str(exc))
 
     def _run_builder(
         self,

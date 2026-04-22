@@ -7,7 +7,12 @@ Built with Python, PyQt6, SQLite, and LaTeX export.
 
 ## Status
 
-Planning phase complete. Build in progress.
+Phase 1 complete | v1.0.0
+
+## Getting Started
+
+See [docs/installation.md](docs/installation.md) for prerequisites, setup
+steps, and instructions for running the test suite.
 
 ## Documentation
 

@@ -113,6 +113,12 @@ class ApplicationsTab(QWidget):
         self._table.doubleClicked.connect(lambda _: self._edit_application())
         root.addWidget(self._table)
 
+        self._empty_label = QLabel(
+            "No applications yet. Click + Add to begin.", self._table
+        )
+        self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_label.hide()
+
         # ── Status bar ───────────────────────────────────────────────────────
         self._status_label = QLabel()
         root.addWidget(self._status_label)
@@ -184,6 +190,7 @@ class ApplicationsTab(QWidget):
         self._table.resizeColumnsToContents()
         self._table.horizontalHeader().setStretchLastSection(True)
         self._apply_filters()
+        self._refresh_empty_state()
 
     def _apply_filters(self) -> None:
         """Hide rows that don't match the search, status, or category. No DB call."""
@@ -226,6 +233,18 @@ class ApplicationsTab(QWidget):
             )
 
         self._update_status_bar()
+        self._refresh_empty_state()
+
+    def _refresh_empty_state(self) -> None:
+        """Show the empty-state label when no rows are visible; hide it otherwise."""
+        visible = sum(
+            1 for r in range(self._table.rowCount())
+            if not self._table.isRowHidden(r)
+        )
+        self._empty_label.setGeometry(self._table.rect())
+        self._empty_label.setVisible(visible == 0)
+        if visible == 0:
+            self._empty_label.raise_()
 
     def _update_status_bar(self) -> None:
         """Count visible rows, group by status label, and update the status bar."""
