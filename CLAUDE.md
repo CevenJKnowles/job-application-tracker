@@ -217,8 +217,8 @@ current milestone and its completion criteria.
 Update this section at the start of each new milestone:
 
 ```
-Active milestone: M1 | Environment and Database Foundation
-Status: In progress
+Active milestone: M2 | Application Shell and Settings Tab
+Status: In Progress
 Last session: 2026-04-22
 ```
 
