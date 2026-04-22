@@ -224,10 +224,12 @@ current milestone and its completion criteria.
 Update this section at the start of each new milestone:
 
 ```
-Active milestone: M6 | Export Tab
-Status: Not started
+Active milestone: COMPLETE
+Status: Phase 1 done
 Last session: 2026-04-22
 
+Completed: M7 | Testing and Polish — 2026-04-22
+Completed: M6 | Export Tab — 2026-04-22
 Completed: M5 | Analytics Tab — 2026-04-22
 Completed: M4 | Applications Tab and Forms — 2026-04-22
 ```
