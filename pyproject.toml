@@ -1,0 +1,16 @@
+[project]
+name = "job-application-tracker"
+version = "0.1.0"
+description = "A local desktop application for tracking job applications."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[project.scripts]
+jat = "jat.main:main"
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
