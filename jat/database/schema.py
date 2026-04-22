@@ -57,6 +57,7 @@ _DDL = [
         company_id          INTEGER PRIMARY KEY AUTOINCREMENT,
         company_name        TEXT NOT NULL UNIQUE,
         company_website     TEXT,
+        notes               TEXT,
         industry            TEXT,
         company_size_band   TEXT,
         linkedin_url        TEXT,
@@ -157,6 +158,13 @@ def _migrate_add_priority_check(conn) -> None:
     conn.execute("DROP TABLE applications_old")
     conn.execute("PRAGMA foreign_key_check")
     conn.execute("PRAGMA foreign_keys = ON")
+
+
+def run_migrations(conn) -> None:
+    """Apply any schema changes needed on existing databases. Safe to call on every startup."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(companies)")}
+    if "notes" not in columns:
+        conn.execute("ALTER TABLE companies ADD COLUMN notes TEXT")
 
 
 def create_tables() -> None:
