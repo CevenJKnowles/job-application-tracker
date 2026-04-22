@@ -2,17 +2,20 @@
 
 from jat.database.connection import get_connection
 
+# (label, funnel_order) — None where funnel_order is not meaningful
+_STATUS_SEEDS = [
+    ("Applied", 1),
+    ("Reviewing", None),
+    ("Interview", 2),
+    ("Final Stage", 3),
+    ("Offer", 4),
+    ("Rejected", None),
+    ("Withdrawn", None),
+    ("Ghosted", None),
+]
+
+# ref_statuses is seeded separately (needs funnel_order)
 _SEEDS = {
-    "ref_statuses": [
-        "Applied",
-        "Reviewing",
-        "Interview",
-        "Final Stage",
-        "Offer",
-        "Rejected",
-        "Withdrawn",
-        "Ghosted",
-    ],
     "ref_categories": [
         "Product Design",
         "UX/UI Design",
@@ -70,6 +73,17 @@ def seed_defaults() -> None:
     only seeded when it is empty, matching the documented behaviour in CLAUDE.md.
     """
     with get_connection() as conn:
+        if _table_is_empty(conn, "ref_statuses"):
+            rows = [
+                (label, idx, funnel_order)
+                for idx, (label, funnel_order) in enumerate(_STATUS_SEEDS)
+            ]
+            conn.executemany(
+                "INSERT OR IGNORE INTO ref_statuses"
+                " (label, sort_order, funnel_order) VALUES (?, ?, ?)",
+                rows,
+            )
+
         for table, labels in _SEEDS.items():
             if not _table_is_empty(conn, table):
                 continue

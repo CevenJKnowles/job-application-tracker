@@ -9,7 +9,8 @@ _DDL = [
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         label       TEXT NOT NULL,
         sort_order  INTEGER DEFAULT 0,
-        is_active   INTEGER DEFAULT 1
+        is_active   INTEGER DEFAULT 1,
+        funnel_order INTEGER
     )
     """,
     """
@@ -165,6 +166,16 @@ def run_migrations(conn) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(companies)")}
     if "notes" not in columns:
         conn.execute("ALTER TABLE companies ADD COLUMN notes TEXT")
+
+    status_columns = {row["name"] for row in conn.execute("PRAGMA table_info(ref_statuses)")}
+    if "funnel_order" not in status_columns:
+        conn.execute("ALTER TABLE ref_statuses ADD COLUMN funnel_order INTEGER")
+
+    for label, order in (("Applied", 1), ("Interview", 2), ("Final Stage", 3), ("Offer", 4)):
+        conn.execute(
+            "UPDATE ref_statuses SET funnel_order = ? WHERE funnel_order IS NULL AND label = ?",
+            (order, label),
+        )
 
 
 def create_tables() -> None:

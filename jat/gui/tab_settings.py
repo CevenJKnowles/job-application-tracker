@@ -30,6 +30,9 @@ _COL_ID = 0
 _COL_LABEL = 1
 _COL_STATUS = 2
 _COL_ORDER = 3
+_COL_FUNNEL = 4
+
+_STATUSES_TABLE = "ref_statuses"
 
 
 class SettingsTab(QWidget):
@@ -89,6 +92,25 @@ class SettingsTab(QWidget):
         btn_row.addWidget(self._btn_down)
 
         right_layout.addLayout(btn_row)
+
+        # ── Funnel button row (ref_statuses only) ────────────────────────────
+        self._funnel_row_widget = QWidget()
+        funnel_row = QHBoxLayout(self._funnel_row_widget)
+        funnel_row.setContentsMargins(0, 0, 0, 0)
+
+        self._btn_set_funnel = QPushButton("Set Funnel Position")
+        self._btn_set_funnel.clicked.connect(self._on_set_funnel)
+        funnel_row.addWidget(self._btn_set_funnel)
+
+        self._btn_remove_funnel = QPushButton("Remove from Funnel")
+        self._btn_remove_funnel.clicked.connect(self._on_remove_funnel)
+        funnel_row.addWidget(self._btn_remove_funnel)
+
+        funnel_row.addStretch()
+
+        right_layout.addWidget(self._funnel_row_widget)
+        self._funnel_row_widget.setVisible(False)
+
         root.addWidget(right)
 
         self._current_table: str | None = None
@@ -100,6 +122,9 @@ class SettingsTab(QWidget):
         """Enable or disable buttons that require a selected row."""
         for btn in (self._btn_edit, self._btn_toggle, self._btn_up, self._btn_down):
             btn.setEnabled(enabled)
+        if self._funnel_row_widget.isVisible():
+            self._btn_set_funnel.setEnabled(enabled)
+            self._btn_remove_funnel.setEnabled(enabled)
 
     def _selected_row_index(self) -> int | None:
         """Return the currently selected visual row index, or None."""
@@ -119,6 +144,14 @@ class SettingsTab(QWidget):
         if self._current_table is None:
             return
 
+        is_statuses = self._current_table == _STATUSES_TABLE
+        col_count = 5 if is_statuses else 4
+        self._table.setColumnCount(col_count)
+        headers = ["ID", "Label", "Status", "Order"]
+        if is_statuses:
+            headers.append("Funnel Position")
+        self._table.setHorizontalHeaderLabels(headers)
+
         rows = ref_model.get_all(self._current_table)
         self._table.setRowCount(0)
 
@@ -130,6 +163,10 @@ class SettingsTab(QWidget):
             status = "Active" if row_data["is_active"] else "Inactive"
             self._table.setItem(visual_row, _COL_STATUS, QTableWidgetItem(status))
             self._table.setItem(visual_row, _COL_ORDER, QTableWidgetItem(str(row_data["sort_order"])))
+            if is_statuses:
+                funnel_val = row_data.get("funnel_order")
+                funnel_text = "" if funnel_val is None else str(funnel_val)
+                self._table.setItem(visual_row, _COL_FUNNEL, QTableWidgetItem(funnel_text))
 
         self._table.resizeColumnsToContents()
         self._set_row_buttons_enabled(False)
@@ -141,6 +178,8 @@ class SettingsTab(QWidget):
         self._current_table = _DISPLAY_TO_TABLE.get(display_name)
         self._heading.setText(display_name)
         self._btn_add.setEnabled(self._current_table is not None)
+        is_statuses = self._current_table == _STATUSES_TABLE
+        self._funnel_row_widget.setVisible(is_statuses)
         self._refresh()
 
     def _on_row_selected(self) -> None:
@@ -224,4 +263,33 @@ class SettingsTab(QWidget):
         ordered_ids = [self._row_id(r) for r in range(self._table.rowCount())]
         ordered_ids[row], ordered_ids[row + 1] = ordered_ids[row + 1], ordered_ids[row]
         ref_model.reorder(self._current_table, ordered_ids)
+        self._refresh()
+
+    def _on_set_funnel(self) -> None:
+        """Prompt for a funnel position integer and persist it for the selected row."""
+        row = self._selected_row_index()
+        if row is None:
+            return
+
+        value, ok = QInputDialog.getInt(
+            self,
+            "Funnel Position",
+            "Position (1–8):",
+            value=1,
+            min=1,
+            max=8,
+        )
+        if not ok:
+            return
+
+        ref_model.set_funnel_order(self._row_id(row), value)
+        self._refresh()
+
+    def _on_remove_funnel(self) -> None:
+        """Clear the funnel position for the selected row."""
+        row = self._selected_row_index()
+        if row is None:
+            return
+
+        ref_model.set_funnel_order(self._row_id(row), None)
         self._refresh()

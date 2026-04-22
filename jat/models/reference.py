@@ -91,3 +91,12 @@ def reorder(table_name: str, ordered_ids: list[int]) -> None:
                 f"UPDATE {table_name} SET sort_order = ? WHERE id = ?",
                 (position, row_id),
             )
+
+
+def set_funnel_order(row_id: int, value: int | None) -> None:
+    """Set funnel_order for the ref_statuses row with the given id. value=None clears it."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE ref_statuses SET funnel_order = ? WHERE id = ?",
+            (value, row_id),
+        )

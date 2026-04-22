@@ -2,6 +2,7 @@
 
 from PyQt6.QtWidgets import QMainWindow, QTabWidget, QWidget
 
+from jat.gui.tab_analytics import AnalyticsTab
 from jat.gui.tab_applications import ApplicationsTab
 from jat.gui.tab_companies import CompaniesTab
 from jat.gui.tab_settings import SettingsTab
@@ -21,9 +22,10 @@ class MainWindow(QMainWindow):
 
         self._applications_tab = ApplicationsTab()
         self._companies_tab = CompaniesTab()
+        self._analytics_tab = AnalyticsTab()
         self._tabs.addTab(self._applications_tab, "Applications")
         self._tabs.addTab(self._companies_tab, "Companies")
-        self._tabs.addTab(QWidget(), "Analytics")
+        self._tabs.addTab(self._analytics_tab, "Analytics")
         self._tabs.addTab(QWidget(), "Export")
         self._tabs.addTab(SettingsTab(), "Settings")
 
