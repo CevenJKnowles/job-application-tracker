@@ -217,11 +217,11 @@ current milestone and its completion criteria.
 Update this section at the start of each new milestone:
 
 ```
-Active milestone: M3 | Companies Tab and CRUD
-Status: In Progress
+Active milestone: M5 | Analytics Tab
+Status: Not started
 Last session: 2026-04-22
 
-Completed: M2 | Application Shell and Settings Tab — 2026-04-22
+Completed: M4 | Applications Tab and Forms — 2026-04-22
 ```
 
 ---

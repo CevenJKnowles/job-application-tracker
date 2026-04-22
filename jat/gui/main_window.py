@@ -2,6 +2,7 @@
 
 from PyQt6.QtWidgets import QMainWindow, QTabWidget, QWidget
 
+from jat.gui.tab_applications import ApplicationsTab
 from jat.gui.tab_companies import CompaniesTab
 from jat.gui.tab_settings import SettingsTab
 
@@ -18,8 +19,19 @@ class MainWindow(QMainWindow):
         self._tabs = QTabWidget()
         self.setCentralWidget(self._tabs)
 
-        self._tabs.addTab(QWidget(), "Applications")
-        self._tabs.addTab(CompaniesTab(), "Companies")
+        self._applications_tab = ApplicationsTab()
+        self._companies_tab = CompaniesTab()
+        self._tabs.addTab(self._applications_tab, "Applications")
+        self._tabs.addTab(self._companies_tab, "Companies")
         self._tabs.addTab(QWidget(), "Analytics")
         self._tabs.addTab(QWidget(), "Export")
         self._tabs.addTab(SettingsTab(), "Settings")
+
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Refresh data-bearing tabs when they come into focus."""
+        if index == 0:
+            self._applications_tab._load_data()
+        elif index == 1:
+            self._companies_tab._load_data()
