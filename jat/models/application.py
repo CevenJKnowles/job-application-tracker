@@ -11,6 +11,7 @@ _UPDATABLE_FIELDS = frozenset(
         "application_date",
         "response_date",
         "status_id",
+        "phase_id",
         "category_id",
         "employment_type_id",
         "source_id",
@@ -28,6 +29,7 @@ _UPDATABLE_FIELDS = frozenset(
 )
 
 _OPTIONAL_INSERT_FIELDS = (
+    "phase_id",
     "status_id",
     "category_id",
     "employment_type_id",
@@ -46,8 +48,14 @@ _OPTIONAL_INSERT_FIELDS = (
 )
 
 _SELECT_COLS = (
-    "a.*, c.company_name, rs.label AS status_label, "
-    "rc.label AS category_label, rw.label AS work_mode_label"
+    "a.*, c.company_name, "
+    "rs.label AS status_label, "
+    "rc.label AS category_label, "
+    "rw.label AS work_mode_label, "
+    "rp.label AS phase_label, "
+    "ret.label AS employment_type_label, "
+    "rsrc.label AS source_label, "
+    "rcur.label AS currency_label"
 )
 _FROM_JOINS = (
     "FROM applications a"
@@ -55,6 +63,10 @@ _FROM_JOINS = (
     " LEFT JOIN ref_statuses rs ON rs.id = a.status_id"
     " LEFT JOIN ref_categories rc ON rc.id = a.category_id"
     " LEFT JOIN ref_work_modes rw ON rw.id = a.work_mode_id"
+    " LEFT JOIN ref_phases rp ON rp.id = a.phase_id"
+    " LEFT JOIN ref_employment_types ret ON ret.id = a.employment_type_id"
+    " LEFT JOIN ref_sources rsrc ON rsrc.id = a.source_id"
+    " LEFT JOIN ref_currencies rcur ON rcur.id = a.currency_id"
 )
 
 
@@ -84,10 +96,11 @@ def add_application(
 
 
 def get_application_by_id(application_id: int) -> sqlite3.Row | None:
-    """Return a single application row by primary key, or None if not found."""
+    """Return a single application row joined to all reference tables, or None."""
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT * FROM applications WHERE application_id = ?",
+            f"SELECT {_SELECT_COLS} {_FROM_JOINS}"
+            " WHERE a.application_id = ?",
             (application_id,),
         ).fetchone()
     return row
@@ -163,6 +176,7 @@ def filter_applications(
     status_id: int | None = None,
     category_id: int | None = None,
     company_id: int | None = None,
+    phase_id: int | None = None,
 ) -> list[sqlite3.Row]:
     """Return applications matching the supplied filters; at least one required."""
     conditions = []
@@ -176,6 +190,9 @@ def filter_applications(
     if company_id is not None:
         conditions.append("a.company_id = ?")
         params.append(company_id)
+    if phase_id is not None:
+        conditions.append("a.phase_id = ?")
+        params.append(phase_id)
 
     if not conditions:
         raise ValueError("At least one filter must be supplied.")

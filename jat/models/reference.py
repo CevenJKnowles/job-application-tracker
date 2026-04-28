@@ -12,6 +12,7 @@ ALLOWED_TABLES = frozenset(
         "ref_sources",
         "ref_work_modes",
         "ref_currencies",
+        "ref_phases",
     }
 )
 
@@ -43,6 +44,11 @@ def get_active(table_name: str) -> list[dict[str, Any]]:
             f"SELECT * FROM {table_name} WHERE is_active = 1 ORDER BY sort_order, id"
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_all_phases() -> list[dict[str, Any]]:
+    """Return all active ref_phases rows ordered by sort_order."""
+    return get_active("ref_phases")
 
 
 def add_label(table_name: str, label: str) -> int:

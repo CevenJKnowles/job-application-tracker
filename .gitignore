@@ -1,27 +1,40 @@
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/settings.json
-
-# Claude Code
+# Claude Code internal
 CLAUDE.md
 
 # Zettlr
 .ztr-directory
 
+# Runtime data
+data/
+*.db
+*.db-shm
+*.db-wal
+
 # Python
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+.Python
+*.egg-info/
+dist/
+build/
 
-# Runtime data
-data/*.db
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
 
-# Compiled LaTeX
+# IDE
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LaTeX build artefacts
 *.aux
 *.fls
 *.fdb_latexmk

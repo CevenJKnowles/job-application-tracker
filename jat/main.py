@@ -14,9 +14,9 @@ from jat.gui.main_window import MainWindow
 def main() -> None:
     """Initialise the database, then launch the GUI."""
     create_tables()
+    seed_defaults()
     with get_connection() as conn:
         run_migrations(conn)
-    seed_defaults()
 
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon("assets/icons/jat_icon.png"))

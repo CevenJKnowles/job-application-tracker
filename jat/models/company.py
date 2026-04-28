@@ -10,6 +10,10 @@ _SELECT_COLUMNS = """
     c.industry,
     c.company_website AS website,
     c.notes,
+    c.contact_name,
+    c.contact_email,
+    c.contact_phone_prefix,
+    c.contact_phone_number,
     c.created_at,
     COUNT(a.application_id) AS application_count
 """
@@ -46,6 +50,10 @@ def add_company(
     industry: str = "",
     website: str = "",
     notes: str = "",
+    contact_name: str = "",
+    contact_email: str = "",
+    contact_phone_prefix: str = "",
+    contact_phone_number: str = "",
 ) -> int:
     """Insert a new company row and return its new id.
 
@@ -60,9 +68,20 @@ def add_company(
         if existing:
             raise ValueError("Company name already exists.")
         cursor = conn.execute(
-            "INSERT INTO companies (company_name, industry, company_website, notes)"
-            " VALUES (?, ?, ?, ?)",
-            (company_name, industry, website, notes),
+            "INSERT INTO companies"
+            " (company_name, industry, company_website, notes,"
+            "  contact_name, contact_email, contact_phone_prefix, contact_phone_number)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                company_name,
+                industry,
+                website,
+                notes,
+                contact_name,
+                contact_email,
+                contact_phone_prefix,
+                contact_phone_number,
+            ),
         )
     return cursor.lastrowid
 
@@ -73,6 +92,10 @@ def update_company(
     industry: str = "",
     website: str = "",
     notes: str = "",
+    contact_name: str = "",
+    contact_email: str = "",
+    contact_phone_prefix: str = "",
+    contact_phone_number: str = "",
 ) -> None:
     """Update an existing company row.
 
@@ -89,9 +112,21 @@ def update_company(
             raise ValueError("Company name already exists.")
         conn.execute(
             "UPDATE companies"
-            " SET company_name = ?, industry = ?, company_website = ?, notes = ?"
+            " SET company_name = ?, industry = ?, company_website = ?, notes = ?,"
+            "     contact_name = ?, contact_email = ?,"
+            "     contact_phone_prefix = ?, contact_phone_number = ?"
             " WHERE company_id = ?",
-            (company_name, industry, website, notes, company_id),
+            (
+                company_name,
+                industry,
+                website,
+                notes,
+                contact_name,
+                contact_email,
+                contact_phone_prefix,
+                contact_phone_number,
+                company_id,
+            ),
         )
 
 
@@ -136,3 +171,44 @@ def get_company_application_count(company_id: int) -> int:
             (company_id,),
         ).fetchone()
     return row[0]
+
+
+def get_company_links(company_id: int) -> list[dict]:
+    """Return all links for a company ordered by link_id."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT link_id, platform, url FROM company_links"
+            " WHERE company_id = ? ORDER BY link_id ASC",
+            (company_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def add_company_link(company_id: int, platform: str, url: str) -> int:
+    """Insert a link for a company and return the new link_id."""
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO company_links (company_id, platform, url) VALUES (?, ?, ?)",
+            (company_id, platform, url),
+        )
+    return cursor.lastrowid
+
+
+def delete_company_link(link_id: int) -> None:
+    """Delete a company link by link_id."""
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM company_links WHERE link_id = ?",
+            (link_id,),
+        )
+
+
+def get_all_industries() -> list[str]:
+    """Return distinct non-empty industry values ordered alphabetically."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT industry FROM companies"
+            " WHERE industry IS NOT NULL AND industry != ''"
+            " ORDER BY industry ASC"
+        ).fetchall()
+    return [row[0] for row in rows]
