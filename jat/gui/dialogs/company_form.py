@@ -10,26 +10,20 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QSizePolicy,
-    QTextEdit,
+    QPlainTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 import jat.models.company as company_model
+import jat.models.reference as ref_model
 from jat.gui.style import COLOURS
-
-_LINK_PLATFORMS = [
-    "LinkedIn",
-    "Glassdoor",
-    "Indeed",
-    "Company Website",
-    "Other",
-]
 
 
 def _section_header(title: str) -> QLabel:
@@ -77,6 +71,10 @@ class CompanyForm(QDialog):
         form.addWidget(self._name_warning, 1, 1)
 
         form.addWidget(QLabel("Industry"), 2, 0)
+        ind_w = QWidget()
+        ind_row = QHBoxLayout(ind_w)
+        ind_row.setContentsMargins(0, 0, 0, 0)
+        ind_row.setSpacing(4)
         self._industry_edit = QLineEdit()
         self._industry_completer = QCompleter(
             company_model.get_all_industries(), self._industry_edit
@@ -88,14 +86,23 @@ class CompanyForm(QDialog):
             QCompleter.CompletionMode.PopupCompletion
         )
         self._industry_edit.setCompleter(self._industry_completer)
-        form.addWidget(self._industry_edit, 2, 1)
+        ind_row.addWidget(self._industry_edit)
+        ind_plus = QPushButton("+")
+        ind_plus.setFixedSize(28, 28)
+        ind_plus.setStyleSheet(
+            f"QPushButton {{ background: {COLOURS['accent']}; color: white;"
+            " border: none; border-radius: 4px; font-size: 14px; }}"
+        )
+        ind_plus.clicked.connect(self._on_accept_industry)
+        ind_row.addWidget(ind_plus)
+        form.addWidget(ind_w, 2, 1)
 
         form.addWidget(QLabel("Website"), 3, 0)
         self._website_edit = QLineEdit()
         form.addWidget(self._website_edit, 3, 1)
 
         form.addWidget(QLabel("Notes"), 4, 0, Qt.AlignmentFlag.AlignTop)
-        self._notes_edit = QTextEdit()
+        self._notes_edit = QPlainTextEdit()
         self._notes_edit.setFixedHeight(72)
         form.addWidget(self._notes_edit, 4, 1)
 
@@ -152,6 +159,9 @@ class CompanyForm(QDialog):
         self._buttons.rejected.connect(self.reject)
         root.addWidget(self._buttons)
 
+        # Load platform list once for the session
+        self._platform_options: list[dict] = ref_model.get_all_link_platforms()
+
         # Wire signals and pre-populate
         self._existing_names = self._load_existing_names()
         if company_id is not None:
@@ -186,14 +196,22 @@ class CompanyForm(QDialog):
 
         for link in company_model.get_company_links(company_id):
             self._add_link_row(
-                platform=link["platform"],
+                platform_id=link.get("platform_id"),
                 url=link["url"],
                 link_id=link["link_id"],
             )
 
+    def _platform_items(self) -> list[tuple[str, int | None]]:
+        """Return (label, id) pairs for the platform combo including 'Other…' at end."""
+        items: list[tuple[str, int | None]] = [
+            (p["label"], p["id"]) for p in self._platform_options
+        ]
+        items.append(("Other…", None))
+        return items
+
     def _add_link_row(
         self,
-        platform: str = "",
+        platform_id: int | None = None,
         url: str = "",
         link_id: int | None = None,
     ) -> None:
@@ -204,10 +222,16 @@ class CompanyForm(QDialog):
         row_layout.setSpacing(6)
 
         platform_combo = QComboBox()
-        platform_combo.addItems(_LINK_PLATFORMS)
-        if platform in _LINK_PLATFORMS:
-            platform_combo.setCurrentText(platform)
-        platform_combo.setFixedWidth(150)
+        platform_combo.setFixedWidth(160)
+        self._populate_platform_combo(platform_combo)
+        if platform_id is not None:
+            idx = platform_combo.findData(platform_id)
+            if idx >= 0:
+                platform_combo.setCurrentIndex(idx)
+
+        platform_combo.currentIndexChanged.connect(
+            lambda _idx, cb=platform_combo: self._on_platform_changed(cb)
+        )
 
         url_edit = QLineEdit()
         url_edit.setPlaceholderText("https://…")
@@ -226,6 +250,44 @@ class CompanyForm(QDialog):
 
         remove_btn.clicked.connect(lambda: self._remove_link_row(entry, row_w))
 
+    def _populate_platform_combo(self, combo: QComboBox) -> None:
+        """Fill a platform combo from current _platform_options plus 'Other…'."""
+        combo.blockSignals(True)
+        current_data = combo.currentData()
+        combo.clear()
+        for label, pid in self._platform_items():
+            combo.addItem(label, pid)
+        if current_data is not None:
+            idx = combo.findData(current_data)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+
+    def _on_platform_changed(self, combo: QComboBox) -> None:
+        """Handle 'Other…' selection: prompt for custom label and add to ref table."""
+        if combo.currentData() is not None:
+            return
+        if combo.currentText() != "Other…":
+            return
+
+        label, ok = QInputDialog.getText(
+            self, "Custom Platform", "Platform name:"
+        )
+        if not ok or not label.strip():
+            # Revert to first option
+            combo.setCurrentIndex(0)
+            return
+
+        new_id = ref_model.add_link_platform(label.strip())
+        # Refresh cached options
+        self._platform_options = ref_model.get_all_link_platforms()
+        # Re-populate all combos and select the new one
+        for cb, _url, _btn, _lid in self._link_rows:
+            self._populate_platform_combo(cb)
+        idx = combo.findData(new_id)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+
     def _remove_link_row(
         self,
         entry: tuple[QComboBox, QLineEdit, QPushButton, int | None],
@@ -236,6 +298,25 @@ class CompanyForm(QDialog):
             self._link_rows.remove(entry)
         row_w.setParent(None)
         row_w.deleteLater()
+
+    def _on_accept_industry(self) -> None:
+        """Accept the currently typed industry value and refresh the completer."""
+        value = self._industry_edit.text().strip()
+        if not value:
+            return
+        # Refresh completer from DB (the save will persist it)
+        all_industries = company_model.get_all_industries()
+        if value not in all_industries:
+            all_industries.append(value)
+            all_industries.sort()
+        self._industry_completer = QCompleter(all_industries, self._industry_edit)
+        self._industry_completer.setCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        self._industry_completer.setCompletionMode(
+            QCompleter.CompletionMode.PopupCompletion
+        )
+        self._industry_edit.setCompleter(self._industry_completer)
 
     def _on_name_changed(self, text: str) -> None:
         """Update conflict flag and warning on every keystroke."""
@@ -291,6 +372,13 @@ class CompanyForm(QDialog):
             return
 
         self._save_links(saved_id)
+        # Refresh industry completer after save so the new value appears next time
+        all_industries = company_model.get_all_industries()
+        self._industry_completer = QCompleter(all_industries, self._industry_edit)
+        self._industry_completer.setCaseSensitivity(
+            Qt.CaseSensitivity.CaseInsensitive
+        )
+        self._industry_edit.setCompleter(self._industry_completer)
         self.accept()
 
     def _save_links(self, company_id: int) -> None:
@@ -299,7 +387,7 @@ class CompanyForm(QDialog):
             company_model.delete_company_link(link["link_id"])
 
         for platform_combo, url_edit, _btn, _lid in self._link_rows:
-            platform = platform_combo.currentText().strip()
+            platform_id = platform_combo.currentData()
             url = url_edit.text().strip()
-            if platform and url:
-                company_model.add_company_link(company_id, platform, url)
+            if platform_id is not None and url:
+                company_model.add_company_link(company_id, platform_id, url)

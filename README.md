@@ -31,9 +31,13 @@ See [docs/installation.md](docs/installation.md) for the full installation guide
 
 ## Features
 
-- Track job applications with status, phase, priority, and salary details
+- Track job applications with phase, status, priority, location, and salary details
+- Phase/Status split: Phase tracks hiring-process milestones (Applied, Final Stage, Offer, Withdrawn); Status tracks the current state (Reviewing, Interview #1–#3, Testing, Rejected, Ghosted)
+- Sortable, column-reorderable table views in Applications and Companies tabs
+- Location field with autocomplete (replaces separate City and Country fields)
+- Inline addition of new sources, categories, and platforms without leaving the form
 - Manage company records including contacts, industry, and platform links
-- Filter applications by status, phase, and category
+- Filter applications by status, phase, and category; filters refresh automatically when reference data changes in Settings
 - Analytics charts via Matplotlib
 - Export reports to LaTeX/PDF via TexMaker, and to Word or ODT
 - Fully local — no accounts, no cloud, no telemetry

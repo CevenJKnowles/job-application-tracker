@@ -120,12 +120,11 @@ def test_update_application_multiple_fields(mem_conn):
     cid = _add_company(mem_conn)
     aid = application_model.add_application(cid, "Original", "2024-01-01")
     application_model.update_application(
-        aid, role_title="Updated", city="London", country="UK"
+        aid, role_title="Updated", location="London, UK"
     )
     row = application_model.get_application_by_id(aid)
     assert row["role_title"] == "Updated"
-    assert row["city"] == "London"
-    assert row["country"] == "UK"
+    assert row["location"] == "London, UK"
 
 
 def test_update_application_changes_updated_at(mem_conn):

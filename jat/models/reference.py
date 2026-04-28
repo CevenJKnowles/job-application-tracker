@@ -13,6 +13,7 @@ ALLOWED_TABLES = frozenset(
         "ref_work_modes",
         "ref_currencies",
         "ref_phases",
+        "ref_link_platforms",
     }
 )
 
@@ -51,6 +52,16 @@ def get_all_phases() -> list[dict[str, Any]]:
     return get_active("ref_phases")
 
 
+def get_all_statuses() -> list[dict[str, Any]]:
+    """Return all active ref_statuses rows ordered by sort_order."""
+    return get_active("ref_statuses")
+
+
+def get_all_link_platforms() -> list[dict[str, Any]]:
+    """Return all active ref_link_platforms rows ordered by sort_order."""
+    return get_active("ref_link_platforms")
+
+
 def add_label(table_name: str, label: str) -> int:
     """Insert a new row with label and sort_order = max(sort_order) + 1. Return new id."""
     _validate(table_name)
@@ -61,6 +72,26 @@ def add_label(table_name: str, label: str) -> int:
         next_order = row["max_order"] + 1
         cursor = conn.execute(
             f"INSERT INTO {table_name} (label, sort_order) VALUES (?, ?)",
+            (label, next_order),
+        )
+    return cursor.lastrowid
+
+
+def add_link_platform(label: str) -> int:
+    """Insert a new ref_link_platforms row or return the existing id (case-insensitive)."""
+    with get_connection() as conn:
+        existing = conn.execute(
+            "SELECT id FROM ref_link_platforms WHERE LOWER(label) = LOWER(?)",
+            (label,),
+        ).fetchone()
+        if existing:
+            return existing["id"]
+        row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM ref_link_platforms"
+        ).fetchone()
+        next_order = row["max_order"] + 1
+        cursor = conn.execute(
+            "INSERT INTO ref_link_platforms (label, sort_order) VALUES (?, ?)",
             (label, next_order),
         )
     return cursor.lastrowid

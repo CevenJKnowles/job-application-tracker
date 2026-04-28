@@ -174,22 +174,24 @@ def get_company_application_count(company_id: int) -> int:
 
 
 def get_company_links(company_id: int) -> list[dict]:
-    """Return all links for a company ordered by link_id."""
+    """Return all links for a company with the platform label joined from ref_link_platforms."""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT link_id, platform, url FROM company_links"
-            " WHERE company_id = ? ORDER BY link_id ASC",
+            "SELECT cl.link_id, cl.platform_id, rlp.label AS platform, cl.url"
+            " FROM company_links cl"
+            " LEFT JOIN ref_link_platforms rlp ON rlp.id = cl.platform_id"
+            " WHERE cl.company_id = ? ORDER BY cl.link_id ASC",
             (company_id,),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
-def add_company_link(company_id: int, platform: str, url: str) -> int:
-    """Insert a link for a company and return the new link_id."""
+def add_company_link(company_id: int, platform_id: int, url: str) -> int:
+    """Insert a link for a company using a ref_link_platforms id; return the new link_id."""
     with get_connection() as conn:
         cursor = conn.execute(
-            "INSERT INTO company_links (company_id, platform, url) VALUES (?, ?, ?)",
-            (company_id, platform, url),
+            "INSERT INTO company_links (company_id, platform_id, url) VALUES (?, ?, ?)",
+            (company_id, platform_id, url),
         )
     return cursor.lastrowid
 

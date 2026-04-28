@@ -1,7 +1,7 @@
 """Export tab for the Job Application Tracker."""
 
 import os
-from datetime import date, timedelta
+from datetime import date
 
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -25,7 +25,7 @@ from jat.models import application as app_model
 from jat.models import reference as ref_model
 
 _REPORT_KEYS = ["afa_table", "application_sheet", "analytics_summary"]
-_REPORT_LABELS = ["AfA-Tabelle", "Bewerbungsblatt", "Analytik-Bericht"]
+_REPORT_LABELS = ["Application Activity Table", "Application Sheet", "Analytics Summary"]
 
 
 class ExportTab(QWidget):
@@ -54,8 +54,8 @@ class ExportTab(QWidget):
     # ------------------------------------------------------------------
 
     def _build_report_group(self) -> QGroupBox:
-        """Build the Bericht group box with the report type combo."""
-        group = QGroupBox("Bericht")
+        """Build the Type group box with the report type combo."""
+        group = QGroupBox("Type")
         vbox = QVBoxLayout(group)
         self._report_combo = QComboBox()
         self._report_combo.addItems(_REPORT_LABELS)
@@ -74,18 +74,18 @@ class ExportTab(QWidget):
         return group
 
     def _build_afa_filter(self) -> QWidget:
-        """Build filter widgets for the AfA-Tabelle report."""
+        """Build filter widgets for the Application Activity Table report."""
         widget = QWidget()
         form = QVBoxLayout(widget)
         today = QDate.currentDate()
 
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("Von:"))
+        row1.addWidget(QLabel("From:"))
         self._afa_date_from = QDateEdit(today.addDays(-90))
         self._afa_date_from.setCalendarPopup(True)
         self._afa_date_from.setDisplayFormat("dd.MM.yyyy")
         row1.addWidget(self._afa_date_from)
-        row1.addWidget(QLabel("Bis:"))
+        row1.addWidget(QLabel("To:"))
         self._afa_date_to = QDateEdit(today)
         self._afa_date_to.setCalendarPopup(True)
         self._afa_date_to.setDisplayFormat("dd.MM.yyyy")
@@ -96,7 +96,7 @@ class ExportTab(QWidget):
         row2 = QHBoxLayout()
         row2.addWidget(QLabel("Status:"))
         self._afa_status_combo = QComboBox()
-        self._afa_status_combo.addItem("Alle", userData=None)
+        self._afa_status_combo.addItem("All", userData=None)
         for status in ref_model.get_active("ref_statuses"):
             self._afa_status_combo.addItem(status["label"], userData=status["id"])
         row2.addWidget(self._afa_status_combo)
@@ -106,10 +106,10 @@ class ExportTab(QWidget):
         return widget
 
     def _build_app_filter(self) -> QWidget:
-        """Build filter widgets for the Bewerbungsblatt report."""
+        """Build filter widgets for the Application Sheet report."""
         widget = QWidget()
         hbox = QHBoxLayout(widget)
-        hbox.addWidget(QLabel("Bewerbung:"))
+        hbox.addWidget(QLabel("Application:"))
         self._app_combo = QComboBox()
         self._app_combo.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
@@ -118,18 +118,18 @@ class ExportTab(QWidget):
         return widget
 
     def _build_analytics_filter(self) -> QWidget:
-        """Build filter widgets for the Analytik-Bericht report."""
+        """Build filter widgets for the Analytics Summary report."""
         widget = QWidget()
         hbox = QHBoxLayout(widget)
         today = QDate.currentDate()
 
-        hbox.addWidget(QLabel("Von:"))
+        hbox.addWidget(QLabel("From:"))
         self._ana_date_from = QDateEdit(today.addDays(-90))
         self._ana_date_from.setCalendarPopup(True)
         self._ana_date_from.setDisplayFormat("dd.MM.yyyy")
         hbox.addWidget(self._ana_date_from)
 
-        hbox.addWidget(QLabel("Bis:"))
+        hbox.addWidget(QLabel("To:"))
         self._ana_date_to = QDateEdit(today)
         self._ana_date_to.setCalendarPopup(True)
         self._ana_date_to.setDisplayFormat("dd.MM.yyyy")
@@ -139,8 +139,8 @@ class ExportTab(QWidget):
         return widget
 
     def _build_export_button(self) -> QPushButton:
-        """Build the full-width Exportieren button."""
-        self._export_btn = QPushButton("Exportieren…")
+        """Build the full-width Export button."""
+        self._export_btn = QPushButton("Export…")
         self._export_btn.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
@@ -193,7 +193,7 @@ class ExportTab(QWidget):
                     self._run_builder(conn, report_type, fmt, output_path)
 
             self._status_label.setStyleSheet("")
-            self._status_label.setText(f"Exportiert nach: {directory}")
+            self._status_label.setText(f"Exported to: {directory}")
 
         except (IOError, OSError, PermissionError) as exc:
             self._status_label.setStyleSheet("color: red;")
@@ -229,7 +229,7 @@ class ExportTab(QWidget):
         elif report_type == "application_sheet":
             app_id = self._app_combo.currentData()
             if app_id is None:
-                raise ValueError("Keine Bewerbung ausgewählt.")
+                raise ValueError("No application selected.")
             if fmt == "tex":
                 content = latex_builder.build_application_sheet(conn, app_id)
                 latex_builder.write_file(content, output_path)

@@ -1,5 +1,7 @@
 """Shared colour constants for the JAT GUI."""
 
+PLACEHOLDER_COLOUR = "#5a6180"
+
 COLOURS = {
     "bg": "#0f1117",
     "surface": "#181c27",

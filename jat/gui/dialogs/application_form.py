@@ -12,13 +12,14 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QTextEdit,
+    QPlainTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -27,6 +28,7 @@ from PyQt6.QtWidgets import (
 import jat.models.application as app_model
 import jat.models.company as company_model
 import jat.models.reference as ref_model
+from jat.database.connection import get_connection
 from jat.gui.dialogs.company_form import CompanyForm
 from jat.gui.style import COLOURS
 from jat.gui.widgets.chip_selector import ChipSelector
@@ -51,18 +53,19 @@ except ImportError:
 
 _PHASE_COLORS: dict[str, str] = {
     "Applied": "#4f7cff",
-    "Interview #1": "#3ecf8e",
-    "Interview #2": "#3ecf8e",
-    "Interview #3": "#3ecf8e",
     "Final Stage": "#f5a623",
+    "Withdrawn": "#5a6180",
+    "Offer": "#22d3a5",
 }
 
 _STATUS_COLORS: dict[str, str] = {
     "Reviewing": "#a78bfa",
     "Rejected": "#e05252",
-    "Withdrawn": "#5a6180",
-    "Offer": "#22d3a5",
     "Ghosted": "#4b5563",
+    "Testing": "#e0a800",
+    "Interview #1": "#3ecf8e",
+    "Interview #2": "#3ecf8e",
+    "Interview #3": "#3ecf8e",
 }
 
 _EMPLOYMENT_COLORS: dict[str, str] = {}
@@ -83,6 +86,17 @@ def _section_header(title: str) -> QLabel:
     return lbl
 
 
+def _plus_button() -> QPushButton:
+    """Return a small styled '+' button for inline addition."""
+    btn = QPushButton("+")
+    btn.setFixedSize(28, 28)
+    btn.setStyleSheet(
+        f"QPushButton {{ background: {COLOURS['accent']}; color: white;"
+        " border: none; border-radius: 4px; font-size: 14px; }}"
+    )
+    return btn
+
+
 class ApplicationForm(QDialog):
     """Add or edit a single application. Pass application_id for edit mode."""
 
@@ -93,7 +107,7 @@ class ApplicationForm(QDialog):
 
         title = "Edit Application" if application_id is not None else "Add Application"
         self.setWindowTitle(title)
-        self.setMinimumSize(620, 700)
+        self.setMinimumSize(640, 720)
 
         root = QVBoxLayout(self)
         root.setSpacing(8)
@@ -142,56 +156,58 @@ class ApplicationForm(QDialog):
         grid.addWidget(self._role_title, row, 1)
         row += 1
 
+        # Application Date and Response Date on the same row
         grid.addWidget(QLabel("Application Date *"), row, 0)
+        dates_w = QWidget()
+        dates_row = QHBoxLayout(dates_w)
+        dates_row.setContentsMargins(0, 0, 0, 0)
+        dates_row.setSpacing(8)
+
         self._application_date = QDateEdit()
         self._application_date.setCalendarPopup(True)
         self._application_date.setDate(QDate.currentDate())
-        grid.addWidget(self._application_date, row, 1)
-        row += 1
+        self._application_date.setFixedWidth(130)
+        dates_row.addWidget(self._application_date)
 
-        grid.addWidget(QLabel("Response Date"), row, 0)
-        resp_w = QWidget()
-        resp_row = QHBoxLayout(resp_w)
-        resp_row.setContentsMargins(0, 0, 0, 0)
-        self._response_date_check = QCheckBox("Enable")
+        dates_row.addSpacing(16)
+        self._response_date_check = QCheckBox("Received")
+        dates_row.addWidget(self._response_date_check)
         self._response_date = QDateEdit()
         self._response_date.setCalendarPopup(True)
         self._response_date.setDate(QDate.currentDate())
         self._response_date.setEnabled(False)
+        self._response_date.setFixedWidth(130)
         self._response_date_check.toggled.connect(self._response_date.setEnabled)
-        resp_row.addWidget(self._response_date_check)
-        resp_row.addWidget(self._response_date)
-        grid.addWidget(resp_w, row, 1)
+        dates_row.addWidget(self._response_date)
+        dates_row.addStretch()
+        grid.addWidget(dates_w, row, 1)
         row += 1
 
         content.addLayout(grid)
 
         # ── Section: Classification ───────────────────────────────────────────
+        # Order: Phase | Status | Employment Type | Work Mode | Category | Source
         content.addWidget(_section_header("Classification"))
         cls_grid = QGridLayout()
         cls_grid.setColumnStretch(1, 1)
         cls_grid.setVerticalSpacing(8)
         row = 0
 
-        cls_grid.addWidget(
-            QLabel("Phase *"), row, 0, Qt.AlignmentFlag.AlignTop
-        )
+        cls_grid.addWidget(QLabel("Phase *"), row, 0, Qt.AlignmentFlag.AlignTop)
         phase_labels = [p["label"] for p in ref_model.get_all_phases()]
         self._phase_chip = ChipSelector(phase_labels, _PHASE_COLORS)
         cls_grid.addWidget(self._phase_chip, row, 1)
         row += 1
 
-        cls_grid.addWidget(
-            QLabel("Status"), row, 0, Qt.AlignmentFlag.AlignTop
-        )
-        status_rows = ref_model.get_active("ref_statuses")
+        cls_grid.addWidget(QLabel("Status *"), row, 0, Qt.AlignmentFlag.AlignTop)
+        status_rows = ref_model.get_all_statuses()
         status_labels = [s["label"] for s in status_rows]
         self._status_chip = ChipSelector(status_labels, _STATUS_COLORS)
         cls_grid.addWidget(self._status_chip, row, 1)
         row += 1
 
         cls_grid.addWidget(
-            QLabel("Employment Type"), row, 0, Qt.AlignmentFlag.AlignTop
+            QLabel("Employment Type *"), row, 0, Qt.AlignmentFlag.AlignTop
         )
         emp_rows = ref_model.get_active("ref_employment_types")
         emp_labels = [e["label"] for e in emp_rows]
@@ -199,58 +215,84 @@ class ApplicationForm(QDialog):
         cls_grid.addWidget(self._employment_chip, row, 1)
         row += 1
 
-        cls_grid.addWidget(QLabel("Category"), row, 0)
-        self._category_edit = QLineEdit()
-        cat_completer = QCompleter(
-            [c["label"] for c in ref_model.get_active("ref_categories")]
+        cls_grid.addWidget(QLabel("Work Mode"), row, 0, Qt.AlignmentFlag.AlignTop)
+        wm_labels = [w["label"] for w in ref_model.get_active("ref_work_modes")]
+        self._work_mode_toggle = SegmentedToggle(wm_labels)
+        self._work_mode_toggle.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        cat_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        cat_completer.setCompletionMode(
-            QCompleter.CompletionMode.PopupCompletion
-        )
-        self._category_edit.setCompleter(cat_completer)
-        cls_grid.addWidget(self._category_edit, row, 1)
+        cls_grid.addWidget(self._work_mode_toggle, row, 1)
         row += 1
 
-        cls_grid.addWidget(QLabel("Source"), row, 0)
+        cls_grid.addWidget(QLabel("Category *"), row, 0)
+        cat_w = QWidget()
+        cat_row = QHBoxLayout(cat_w)
+        cat_row.setContentsMargins(0, 0, 0, 0)
+        cat_row.setSpacing(4)
+        self._category_edit = QLineEdit()
+        self._cat_completer_model: list[str] = [
+            c["label"] for c in ref_model.get_active("ref_categories")
+        ]
+        cat_completer = QCompleter(self._cat_completer_model)
+        cat_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        cat_completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._category_edit.setCompleter(cat_completer)
+        cat_row.addWidget(self._category_edit)
+        cat_plus = _plus_button()
+        cat_plus.clicked.connect(self._on_add_category)
+        cat_row.addWidget(cat_plus)
+        cls_grid.addWidget(cat_w, row, 1)
+        row += 1
+
+        cls_grid.addWidget(QLabel("Source *"), row, 0)
+        src_w = QWidget()
+        src_row = QHBoxLayout(src_w)
+        src_row.setContentsMargins(0, 0, 0, 0)
+        src_row.setSpacing(4)
         self._source_edit = QLineEdit()
-        src_completer = QCompleter(
-            [s["label"] for s in ref_model.get_active("ref_sources")]
-        )
+        self._source_edit.setMaximumWidth(160)
+        self._src_completer_model: list[str] = [
+            s["label"] for s in ref_model.get_active("ref_sources")
+        ]
+        src_completer = QCompleter(self._src_completer_model)
         src_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        src_completer.setCompletionMode(
-            QCompleter.CompletionMode.PopupCompletion
-        )
+        src_completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self._source_edit.setCompleter(src_completer)
-        cls_grid.addWidget(self._source_edit, row, 1)
+        src_row.addWidget(self._source_edit)
+        src_plus = _plus_button()
+        src_plus.clicked.connect(self._on_add_source)
+        src_row.addWidget(src_plus)
+        cls_grid.addWidget(src_w, row, 1)
         row += 1
 
         content.addLayout(cls_grid)
 
-        # ── Section: Location & Mode ──────────────────────────────────────────
-        content.addWidget(_section_header("Location & Mode"))
+        # ── Section: Location ─────────────────────────────────────────────────
+        content.addWidget(_section_header("Location"))
         loc_grid = QGridLayout()
         loc_grid.setColumnStretch(1, 1)
         loc_grid.setVerticalSpacing(8)
-        row = 0
 
-        loc_grid.addWidget(
-            QLabel("Work Mode"), row, 0, Qt.AlignmentFlag.AlignTop
+        loc_grid.addWidget(QLabel("Location"), 0, 0)
+        loc_w = QWidget()
+        loc_row_layout = QHBoxLayout(loc_w)
+        loc_row_layout.setContentsMargins(0, 0, 0, 0)
+        loc_row_layout.setSpacing(4)
+        self._location_edit = QLineEdit()
+        self._location_edit.setPlaceholderText("e.g. Berlin, Germany")
+        self._location_completer_strings: list[str] = self._load_location_suggestions()
+        self._location_completer = QCompleter(self._location_completer_strings)
+        self._location_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._location_completer.setCompletionMode(
+            QCompleter.CompletionMode.PopupCompletion
         )
-        wm_labels = [w["label"] for w in ref_model.get_active("ref_work_modes")]
-        self._work_mode_toggle = SegmentedToggle(wm_labels)
-        loc_grid.addWidget(self._work_mode_toggle, row, 1)
-        row += 1
-
-        loc_grid.addWidget(QLabel("City"), row, 0)
-        self._city = QLineEdit()
-        loc_grid.addWidget(self._city, row, 1)
-        row += 1
-
-        loc_grid.addWidget(QLabel("Country"), row, 0)
-        self._country = QLineEdit()
-        loc_grid.addWidget(self._country, row, 1)
-        row += 1
+        self._location_edit.setCompleter(self._location_completer)
+        loc_row_layout.addWidget(self._location_edit)
+        loc_plus = _plus_button()
+        loc_plus.setToolTip("Add current value to suggestions")
+        loc_plus.clicked.connect(self._on_add_location_suggestion)
+        loc_row_layout.addWidget(loc_plus)
+        loc_grid.addWidget(loc_w, 0, 1)
 
         content.addLayout(loc_grid)
 
@@ -261,7 +303,6 @@ class ApplicationForm(QDialog):
         comp_grid.setVerticalSpacing(8)
         row = 0
 
-        # Currency favourites + completer
         comp_grid.addWidget(
             QLabel("Currency"), row, 0, Qt.AlignmentFlag.AlignTop
         )
@@ -293,9 +334,7 @@ class ApplicationForm(QDialog):
         ]
         cur_completer = QCompleter(cur_items)
         cur_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        cur_completer.setCompletionMode(
-            QCompleter.CompletionMode.PopupCompletion
-        )
+        cur_completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         cur_completer.activated.connect(self._on_currency_activated)
         self._currency_edit.setCompleter(cur_completer)
         self._currency_edit.textEdited.connect(self._on_currency_text_edited)
@@ -376,7 +415,7 @@ class ApplicationForm(QDialog):
         meta_grid.addWidget(
             QLabel("Notes"), row, 0, Qt.AlignmentFlag.AlignTop
         )
-        self._notes = QTextEdit()
+        self._notes = QPlainTextEdit()
         self._notes.setFixedHeight(80)
         meta_grid.addWidget(self._notes, row, 1)
         row += 1
@@ -402,6 +441,16 @@ class ApplicationForm(QDialog):
 
     # ── Private: reference data maps ─────────────────────────────────────────
 
+    def _load_location_suggestions(self) -> list[str]:
+        """Return distinct non-empty location values from the applications table."""
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT location FROM applications"
+                " WHERE location IS NOT NULL AND location != ''"
+                " ORDER BY location ASC"
+            ).fetchall()
+        return [row[0] for row in rows]
+
     def _load_ref_data(self) -> None:
         """Build label→id maps for all reference tables used in this form."""
         self._phase_map: dict[str, int] = {}
@@ -409,7 +458,7 @@ class ApplicationForm(QDialog):
             self._phase_map[r["label"]] = r["id"]
 
         self._status_map: dict[str, int] = {}
-        for r in ref_model.get_active("ref_statuses"):
+        for r in ref_model.get_all_statuses():
             self._status_map[r["label"]] = r["id"]
 
         self._employment_map: dict[str, int] = {}
@@ -478,6 +527,17 @@ class ApplicationForm(QDialog):
             self._source_edit.setText(record["source_label"])
         if record["work_mode_label"]:
             self._work_mode_toggle.set_selected(record["work_mode_label"])
+
+        # Populate location — prefer the location column, fall back to city/country
+        location = record["location"] if record["location"] else ""
+        if not location:
+            city = record["city"] or ""
+            country = record["country"] or ""
+            if city and country:
+                location = f"{city}, {country}"
+            elif city or country:
+                location = city or country
+        self._location_edit.setText(location)
 
         currency_code = record["currency_label"]
         if currency_code:
@@ -591,6 +651,69 @@ class ApplicationForm(QDialog):
                         )
                     )
 
+    # ── Private: source / category add buttons ────────────────────────────────
+
+    def _on_add_source(self) -> None:
+        """Prompt for a new source label, add to ref_sources, refresh completer."""
+        label, ok = QInputDialog.getText(self, "Add Source", "Source label:")
+        if not ok or not label.strip():
+            return
+        label = label.strip()
+        new_id = ref_model.add_label("ref_sources", label)
+        self._source_map[label.lower()] = new_id
+        self._src_completer_model.append(label)
+        self._source_edit.setCompleter(
+            self._make_completer(self._src_completer_model)
+        )
+        self._source_edit.setText(label)
+        # Notify main window consumers
+        self._emit_reference_changed("ref_sources")
+
+    def _on_add_category(self) -> None:
+        """Prompt for a new category label, add to ref_categories, refresh completer."""
+        label, ok = QInputDialog.getText(self, "Add Category", "Category label:")
+        if not ok or not label.strip():
+            return
+        label = label.strip()
+        new_id = ref_model.add_label("ref_categories", label)
+        self._category_map[label.lower()] = new_id
+        self._cat_completer_model.append(label)
+        self._category_edit.setCompleter(
+            self._make_completer(self._cat_completer_model)
+        )
+        self._category_edit.setText(label)
+        self._emit_reference_changed("ref_categories")
+
+    def _on_add_location_suggestion(self) -> None:
+        """Add the currently typed location to the completer model (no DB write)."""
+        value = self._location_edit.text().strip()
+        if value and value not in self._location_completer_strings:
+            self._location_completer_strings.append(value)
+            self._location_completer = QCompleter(self._location_completer_strings)
+            self._location_completer.setCaseSensitivity(
+                Qt.CaseSensitivity.CaseInsensitive
+            )
+            self._location_completer.setCompletionMode(
+                QCompleter.CompletionMode.PopupCompletion
+            )
+            self._location_edit.setCompleter(self._location_completer)
+
+    def _make_completer(self, items: list[str]) -> QCompleter:
+        """Return a case-insensitive popup QCompleter for the given items."""
+        c = QCompleter(items)
+        c.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        c.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        return c
+
+    def _emit_reference_changed(self, table_name: str) -> None:
+        """Walk up to the main window and emit reference_data_changed if available."""
+        widget = self.parent()
+        while widget is not None:
+            if hasattr(widget, "reference_data_changed"):
+                widget.reference_data_changed.emit(table_name)
+                return
+            widget = widget.parent() if hasattr(widget, "parent") else None
+
     # ── Private: validation helpers ───────────────────────────────────────────
 
     def _resolve_id(self, label: str, mapping: dict[str, int]) -> int | None:
@@ -606,8 +729,29 @@ class ApplicationForm(QDialog):
         company_id = self._company_map.get(company_name.lower())
         role_title = self._role_title.text().strip()
         application_date = self._application_date.date().toString("yyyy-MM-dd")
+
         phase_label = self._phase_chip.get_selected()
         phase_id = self._phase_map.get(phase_label) if phase_label else None
+
+        status_label = self._status_chip.get_selected()
+        status_id = self._status_map.get(status_label) if status_label else None
+
+        emp_label = self._employment_chip.get_selected()
+        employment_type_id = (
+            self._employment_map.get(emp_label) if emp_label else None
+        )
+
+        category_text = self._category_edit.text().strip()
+        category_id = (
+            self._resolve_id(category_text, self._category_map)
+            if category_text else None
+        )
+
+        source_text = self._source_edit.text().strip()
+        source_id = (
+            self._resolve_id(source_text, self._source_map)
+            if source_text else None
+        )
 
         errors: list[str] = []
         if not company_name or company_id is None:
@@ -618,6 +762,14 @@ class ApplicationForm(QDialog):
             errors.append("Application Date is required.")
         if phase_id is None:
             errors.append("Phase is required.")
+        if status_id is None:
+            errors.append("Status is required.")
+        if employment_type_id is None:
+            errors.append("Employment Type is required.")
+        if category_id is None:
+            errors.append("Category is required.")
+        if source_id is None:
+            errors.append("Source is required.")
         if errors:
             QMessageBox.warning(self, "Validation Error", "\n".join(errors))
             return
@@ -633,22 +785,6 @@ class ApplicationForm(QDialog):
             return
 
         # ── Resolve optional IDs ──────────────────────────────────────────────
-        status_label = self._status_chip.get_selected()
-        status_id = self._status_map.get(status_label) if status_label else None
-
-        emp_label = self._employment_chip.get_selected()
-        employment_type_id = (
-            self._employment_map.get(emp_label) if emp_label else None
-        )
-
-        category_text = self._category_edit.text().strip()
-        category_id = self._resolve_id(category_text, self._category_map) \
-            if category_text else None
-
-        source_text = self._source_edit.text().strip()
-        source_id = self._resolve_id(source_text, self._source_map) \
-            if source_text else None
-
         wm_label = self._work_mode_toggle.get_selected()
         work_mode_id = self._work_mode_map.get(wm_label) if wm_label else None
 
@@ -671,6 +807,8 @@ class ApplicationForm(QDialog):
         salary_min = _parse_salary(self._salary_min.text())
         salary_max = _parse_salary(self._salary_max.text())
 
+        location = self._location_edit.text().strip() or None
+
         kwargs: dict = {
             "phase_id": phase_id,
             "status_id": status_id,
@@ -682,6 +820,7 @@ class ApplicationForm(QDialog):
             "salary_min": salary_min,
             "salary_max": salary_max,
             "priority_score": self._priority_value,
+            "location": location,
             "response_date": (
                 self._response_date.date().toString("yyyy-MM-dd")
                 if self._response_date_check.isChecked()
@@ -693,8 +832,6 @@ class ApplicationForm(QDialog):
                 else None
             ),
             "job_posting_url": url or None,
-            "city": self._city.text().strip() or None,
-            "country": self._country.text().strip() or None,
             "notes": self._notes.toPlainText().strip() or None,
         }
 

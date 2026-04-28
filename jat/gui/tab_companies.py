@@ -1,15 +1,17 @@
 """Companies tab: browse, search, and manage company records."""
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSortFilterProxyModel
+from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
+    QDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
@@ -25,9 +27,48 @@ _COL_WEBSITE = 3
 _COL_APPLICATIONS = 4
 _COL_NOTES = 5
 
+_NUM_COLS = 6
+
+_HEADERS = ["ID", "Company Name", "Industry", "Website", "Applications", "Notes"]
+
+_ROLE_ID = Qt.ItemDataRole.UserRole
+
+
+class _CompanyFilterProxy(QSortFilterProxyModel):
+    """Proxy that filters rows by search text and industry."""
+
+    def __init__(self, parent=None) -> None:
+        """Initialise with pass-all filter state."""
+        super().__init__(parent)
+        self._search = ""
+        self._industry = ""
+
+    def set_filters(self, search: str, industry: str) -> None:
+        """Update filter criteria and refresh the view."""
+        self._search = search.lower()
+        self._industry = industry
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row: int, source_parent) -> bool:
+        """Return True if the row passes all active filters."""
+        model = self.sourceModel()
+
+        if self._search:
+            name = (model.item(source_row, _COL_NAME) or QStandardItem()).text()
+            ind = (model.item(source_row, _COL_INDUSTRY) or QStandardItem()).text()
+            if self._search not in name.lower() and self._search not in ind.lower():
+                return False
+
+        if self._industry and self._industry != "All Industries":
+            ind = (model.item(source_row, _COL_INDUSTRY) or QStandardItem()).text()
+            if ind != self._industry:
+                return False
+
+        return True
+
 
 class CompaniesTab(QWidget):
-    """Left toolbar + table for company CRUD; client-side search and filter."""
+    """Toolbar + table for company CRUD; client-side search and filter."""
 
     def __init__(self, parent=None) -> None:
         """Build the toolbar, table, and status bar."""
@@ -65,16 +106,29 @@ class CompaniesTab(QWidget):
 
         root.addLayout(toolbar)
 
-        # ── Table ────────────────────────────────────────────────────────────
-        self._table = QTableWidget(0, 6)
-        self._table.setHorizontalHeaderLabels(
-            ["ID", "Company Name", "Industry", "Website", "Applications", "Notes"]
-        )
+        # ── Model + proxy ────────────────────────────────────────────────────
+        self._source_model = QStandardItemModel(0, _NUM_COLS)
+        self._source_model.setHorizontalHeaderLabels(_HEADERS)
+
+        self._proxy = _CompanyFilterProxy()
+        self._proxy.setSourceModel(self._source_model)
+
+        # ── Table view ───────────────────────────────────────────────────────
+        self._table = QTableView()
+        self._table.setModel(self._proxy)
         self._table.setColumnHidden(_COL_ID, True)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        header = self._table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionsMovable(True)
+        header.setDragEnabled(True)
+        header.setSortIndicatorShown(True)
+        self._table.setSortingEnabled(True)
+
+        self._table.doubleClicked.connect(self._on_row_double_clicked)
         root.addWidget(self._table)
 
         self._empty_label = QLabel(
@@ -93,10 +147,12 @@ class CompaniesTab(QWidget):
 
     def _selected_company_id(self) -> int | None:
         """Return the database id of the selected row, or None."""
-        indexes = self._table.selectedIndexes()
-        if not indexes:
+        rows = self._table.selectionModel().selectedRows()
+        if not rows:
             return None
-        return int(self._table.item(indexes[0].row(), _COL_ID).text())
+        source_row = self._proxy.mapToSource(rows[0]).row()
+        item = self._source_model.item(source_row, _COL_ID)
+        return int(item.text()) if item else None
 
     def _load_data(self) -> None:
         """Fetch all companies from the model, repopulate the table and filter combo."""
@@ -114,29 +170,23 @@ class CompaniesTab(QWidget):
         self._industry_combo.setCurrentIndex(idx if idx >= 0 else 0)
         self._industry_combo.blockSignals(False)
 
-        # Repopulate table
-        self._table.setRowCount(0)
+        # Repopulate source model
+        self._source_model.setRowCount(0)
         for row in rows:
-            visual = self._table.rowCount()
-            self._table.insertRow(visual)
-            self._table.setItem(visual, _COL_ID, QTableWidgetItem(str(row["id"])))
-            self._table.setItem(
-                visual, _COL_NAME, QTableWidgetItem(row["company_name"] or "")
-            )
-            self._table.setItem(
-                visual, _COL_INDUSTRY, QTableWidgetItem(row["industry"] or "")
-            )
-            self._table.setItem(
-                visual, _COL_WEBSITE, QTableWidgetItem(row["website"] or "")
-            )
-            self._table.setItem(
-                visual,
-                _COL_APPLICATIONS,
-                QTableWidgetItem(str(row["application_count"])),
-            )
-            self._table.setItem(
-                visual, _COL_NOTES, QTableWidgetItem(row["notes"] or "")
-            )
+            id_item = QStandardItem(str(row["id"]))
+            name_item = QStandardItem(row["company_name"] or "")
+            industry_item = QStandardItem(row["industry"] or "")
+            website_item = QStandardItem(row["website"] or "")
+            apps_item = QStandardItem(str(row["application_count"]))
+            notes_item = QStandardItem(row["notes"] or "")
+            self._source_model.appendRow([
+                id_item,
+                name_item,
+                industry_item,
+                website_item,
+                apps_item,
+                notes_item,
+            ])
 
         self._table.resizeColumnsToContents()
         self._table.horizontalHeader().setStretchLastSection(True)
@@ -145,34 +195,16 @@ class CompaniesTab(QWidget):
         self._refresh_empty_state()
 
     def _apply_filter(self) -> None:
-        """Show/hide rows based on the search input and industry combo. No DB call."""
-        search = self._search_input.text().strip().lower()
-        industry_filter = self._industry_combo.currentText()
-        all_industries = industry_filter == "All Industries"
-
-        for row in range(self._table.rowCount()):
-            name_text = (self._table.item(row, _COL_NAME) or QTableWidgetItem("")).text()
-            ind_text = (
-                self._table.item(row, _COL_INDUSTRY) or QTableWidgetItem("")
-            ).text()
-
-            matches_search = (
-                not search
-                or search in name_text.lower()
-                or search in ind_text.lower()
-            )
-            matches_industry = all_industries or ind_text == industry_filter
-
-            self._table.setRowHidden(row, not (matches_search and matches_industry))
-
+        """Push current filter criteria to the proxy model."""
+        self._proxy.set_filters(
+            search=self._search_input.text().strip(),
+            industry=self._industry_combo.currentText(),
+        )
         self._refresh_empty_state()
 
     def _refresh_empty_state(self) -> None:
         """Show the empty-state label when no rows are visible; hide it otherwise."""
-        visible = sum(
-            1 for r in range(self._table.rowCount())
-            if not self._table.isRowHidden(r)
-        )
+        visible = self._proxy.rowCount()
         self._empty_label.setGeometry(self._table.rect())
         self._empty_label.setVisible(visible == 0)
         if visible == 0:
@@ -190,7 +222,7 @@ class CompaniesTab(QWidget):
     def _on_add(self) -> None:
         """Open the Add Company dialog; reload on success."""
         dlg = CompanyForm(parent=self)
-        if dlg.exec() == CompanyForm.DialogCode.Accepted:
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             self._load_data()
 
     def _on_edit(self) -> None:
@@ -200,7 +232,16 @@ class CompaniesTab(QWidget):
             QMessageBox.warning(self, "No Selection", "Select a company to edit.")
             return
         dlg = CompanyForm(parent=self, company_id=company_id)
-        if dlg.exec() == CompanyForm.DialogCode.Accepted:
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._load_data()
+
+    def _on_row_double_clicked(self, index) -> None:
+        """Open the Edit Company dialog when a row is double-clicked."""
+        company_id = self._selected_company_id()
+        if company_id is None:
+            return
+        dlg = CompanyForm(parent=self, company_id=company_id)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             self._load_data()
 
     def _on_delete(self) -> None:
@@ -210,8 +251,11 @@ class CompaniesTab(QWidget):
             QMessageBox.warning(self, "No Selection", "Select a company to delete.")
             return
 
-        row_index = self._table.selectedIndexes()[0].row()
-        name = self._table.item(row_index, _COL_NAME).text()
+        sel_rows = self._table.selectionModel().selectedRows()
+        if not sel_rows:
+            return
+        source_row = self._proxy.mapToSource(sel_rows[0]).row()
+        name = (self._source_model.item(source_row, _COL_NAME) or QStandardItem()).text()
 
         dlg = ConfirmDialog(
             f"Delete '{name}'?\n\nThis action cannot be undone.", parent=self
